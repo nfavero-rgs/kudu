@@ -504,7 +504,6 @@ namespace Kudu.Core.SiteExtensions
         {
             try
             {
-                // package path from local repo
                 EnsureInstallationEnviroment(installationDirectory, tracer);
 
                 string packageLocalFilePath = GetNuGetPackageFile(package.Identity.Id, package.Identity.Version.ToString());
@@ -609,29 +608,26 @@ namespace Kudu.Core.SiteExtensions
 
             using (tracer.Step("There was leftover data from previous uninstallation. Trying to cleanup now."))
             {
-                bool canCleanup = true;
                 try
                 {
-                    OperationManager.Attempt(() => FileSystemHelpers.DeleteDirectoryContentsSafe(installationDir, ignoreErrors: false));
+                    OperationManager.Attempt(() => FileSystemHelpers.DeleteDirectorySafe(installationDir, ignoreErrors: false));
+                    return;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    canCleanup = false;
+                    tracer.TraceError(ex);
                 }
 
-                if (!canCleanup)
-                {
-                    FileSystemHelpers.EnsureDirectory(_toBeDeletedDirectoryPath);
-                    DirectoryInfo dirInfo = new DirectoryInfo(installationDir);
-                    string tmpFoder = Path.Combine(
-                        _toBeDeletedDirectoryPath,
-                        string.Format(CultureInfo.InvariantCulture, "{0}-{1}", dirInfo.Name, Guid.NewGuid().ToString("N").Substring(0, 8)));
+                FileSystemHelpers.EnsureDirectory(_toBeDeletedDirectoryPath);
+                DirectoryInfo dirInfo = new DirectoryInfo(installationDir);
+                string tmpFoder = Path.Combine(
+                    _toBeDeletedDirectoryPath,
+                    string.Format(CultureInfo.InvariantCulture, "{0}-{1}", dirInfo.Name, Guid.NewGuid().ToString("N").Substring(0, 8)));
 
-                    using (tracer.Step("Failed to cleanup. Moving leftover data to {0}", tmpFoder))
-                    {
-                        // if failed, let exception bubble up to trigger bad request
-                        OperationManager.Attempt(() => FileSystemHelpers.MoveDirectory(installationDir, tmpFoder));
-                    }
+                using (tracer.Step("Failed to cleanup. Moving leftover data to {0}", tmpFoder))
+                {
+                    // if failed, let exception bubble up to trigger bad request
+                    OperationManager.Attempt(() => FileSystemHelpers.MoveDirectory(installationDir, tmpFoder));
                 }
             }
 
